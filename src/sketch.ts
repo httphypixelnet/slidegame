@@ -1,3 +1,6 @@
+const debugRef = document.createElement('div');
+const debugText = new Array<string>();
+document.body.appendChild(debugRef);
 interface GameConfig {
   canvasWidth: number;
   canvasHeight: number;
@@ -22,12 +25,11 @@ const CONFIG: GameConfig = {
   canvasHeight: 400,
   gravity: 0.8,
   jumpForce: -15,
-  groundLevel: window.innerHeight - 50, // Adjust ground level relative to window height
+  groundLevel: 390,
   initialLives: 3,
   scoreIncrement: 100,
-  // Add relative sizing for sprites
-  playerSize: 64, // Player will be 10% of screen height
-  languageSize: 64, // Language icons will be 8% of screen height
+  playerSize: 64,
+  languageSize: 64
 };
 
 const ANIMATIONS: AnimationAssets = {
@@ -51,17 +53,17 @@ class Player {
 
   constructor() {
       this.sprite = new Sprite(
-        CONFIG.canvasWidth * 0.1, // Position player at 10% of screen width
+        CONFIG.canvasWidth * 0.1,
         CONFIG.canvasHeight / 2
       );
       this.sprite.width = CONFIG.playerSize;
       this.sprite.height = CONFIG.playerSize;
       this.sprite.img = ANIMATIONS.playerImage;
-  
+
       this.sprite.layer = 1;
       this.sprite.collider = 'dynamic';
       this.sprite.rotationLock = true;
-  
+
       this.score = 0;
       this.lives = CONFIG.initialLives;
     }
@@ -69,7 +71,7 @@ class Player {
   update(): void {
     // Apply gravity
     this.sprite.vel.y += CONFIG.gravity;
-    
+
     // Ground check
     if (this.sprite.y >= CONFIG.groundLevel) {
       this.sprite.y = CONFIG.groundLevel;
@@ -77,7 +79,7 @@ class Player {
     }
 
     // Jump control
-    if ((kb.presses('space') || kb.pre) && this.sprite.y >= CONFIG.groundLevel) {
+    if ((kb.presses('space') || kb.presses("up")) && this.sprite.y >= CONFIG.groundLevel) {
       this.sprite.vel.y = CONFIG.jumpForce;
     }
   }
@@ -89,11 +91,12 @@ class LanguageSprite {
 
   public sprite: Sprite;
   private type: LanguageType;
+  private speed: number;
 
   constructor(isGood: boolean) {
       const languages = isGood ? LanguageSprite.goodLanguages : LanguageSprite.badLanguages;
       this.type = languages[Math.floor(Math.random() * languages.length)];
-  
+
       this.sprite = new Sprite(
         CONFIG.canvasWidth + CONFIG.languageSize, // Start just off screen
         random(CONFIG.languageSize, CONFIG.groundLevel - CONFIG.languageSize)
@@ -101,24 +104,25 @@ class LanguageSprite {
       this.sprite.width = CONFIG.languageSize;
       this.sprite.height = CONFIG.languageSize;
       this.sprite.isGood = isGood;
-      
-      this.sprite.addAni('spin', ANIMATIONS.languages[this.type], { 
+
+      this.sprite.addAni('spin', ANIMATIONS.languages[this.type], {
         frameSize: [64, 64],
         frames: 32,
-        frameDelay: 2 
+        frameDelay: 2
       });
-  
+      this.speed = random(-CONFIG.canvasWidth * 0.01, -CONFIG.canvasWidth * 0.005);
       // Adjust velocity based on screen width
-      this.sprite.vel.x = random(-CONFIG.canvasWidth * 0.01, -CONFIG.canvasWidth * 0.005);
-      this.sprite.collider = 'dynamic';
+      this.sprite.collider = 'static';
       this.sprite.rotationLock = true;
     }
-
+    update(): void {
+      this.sprite.x += this.speed;
+    }
     reset(): void {
-        this.sprite.x = CONFIG.canvasWidth + CONFIG.languageSize;
-        this.sprite.y = random(CONFIG.languageSize, CONFIG.groundLevel - CONFIG.languageSize);
-        this.sprite.vel.x = random(-CONFIG.canvasWidth * 0.01, -CONFIG.canvasWidth * 0.005);
-      }
+      this.sprite.x = CONFIG.canvasWidth + CONFIG.languageSize;
+      this.sprite.y = random(CONFIG.languageSize, CONFIG.groundLevel - CONFIG.languageSize);
+      this.speed = random(-CONFIG.canvasWidth * 0.01, -CONFIG.canvasWidth * 0.005);
+    }
 }
 
 
@@ -136,7 +140,9 @@ class Game {
     this.spawnTimer = 0;
     this.gameOver = false;
   }
-
+  public getPlayer(): Player {
+      return this.player;
+    }
   private spawnLanguage(): LanguageSprite {
     const isGood = random() > 0.5;
     const lang = new LanguageSprite(isGood);
@@ -158,6 +164,7 @@ class Game {
 
     // Update languages
     for (const lang of this.languages) {
+      lang.update();
       if (lang.x < -50) {
         lang.remove();
       }
@@ -216,4 +223,12 @@ function setup() {
 function draw() {
   game.update();
   game.draw();
+  debugText.length = 0;
+  debugText.push(
+    `FPS: ${frameRate().toFixed(2)}`,
+    `Game over: ${game.gameOver}`,
+    `Player Position: (${game.getPlayer().sprite.x.toFixed(2)}, ${game.getPlayer().sprite.y.toFixed(2)})`,
+    `Player Velocity: (${game.getPlayer().sprite.vel.x.toFixed(2)}, ${game.getPlayer().sprite.vel.y.toFixed(2)})`
+  )
+  debugRef.innerHTML = debugText.join('<br>');
 }
